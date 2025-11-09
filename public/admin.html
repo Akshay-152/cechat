@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1.0" />
+  <title>Push Admin Panel</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f4f6f8;
+      color: #222;
+      margin: 0;
+      padding: 2rem;
+    }
+    h2, h3 { color: #0052cc; }
+    button {
+      background: #0052cc;
+      color: #fff;
+      border: none;
+      padding: 0.5rem 1rem;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    button:hover { background: #003f9e; }
+    input, textarea, select {
+      margin: 4px 0;
+      padding: 6px;
+      width: 100%;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+    }
+    .container {
+      background: #fff;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+      max-width: 700px;
+      margin: auto;
+    }
+    ul {
+      background: #fff;
+      padding: 10px;
+      border-radius: 6px;
+      list-style: none;
+      max-height: 300px;
+      overflow-y: auto;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+    }
+    li { padding: 4px 0; border-bottom: 1px solid #eee; font-size: 14px; }
+    li:last-child { border-bottom: none; }
+    .log {
+      background: #111;
+      color: #0f0;
+      padding: 8px;
+      font-size: 12px;
+      border-radius: 6px;
+      overflow-y: auto;
+      height: 140px;
+      margin-top: 10px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>Admin Panel — Send Push Notifications</h2>
+    <button id="refresh">Refresh Users</button>
+    <ul id="users"></ul>
+
+    <h3>Send Notification</h3>
+    <label>Title</label>
+    <input id="title" placeholder="Notification title" value="CECHAT" />
+
+    <label>Body</label>
+    <textarea id="body" rows="2" placeholder="Notification body">Welcome!</textarea>
+
+    <label>URL (open on click)</label>
+    <input id="url" placeholder="/" value="/" />
+
+    <label>Icon (optional)</label>
+    <input id="icon" placeholder="https://example.com/icon.png" />
+
+    <label>TTL (seconds)</label>
+    <input id="ttl" value="86400" />
+
+    <label>Tag (optional)</label>
+    <input id="tag" placeholder="group-tag" />
+
+    <label>Custom JSON Data (optional)</label>
+    <textarea id="data" rows="3" placeholder='{"foo":"bar"}'>{}</textarea>
+
+    <label>Target</label>
+    <select id="target">
+      <option value="all">All users</option>
+      <option value="single">Single user</option>
+    </select>
+
+    <label>User ID (for single)</label>
+    <input id="userId" placeholder="Enter userId if target=single" />
+
+    <button id="send" style="margin-top:10px;">Send Notification</button>
+
+    <div class="log" id="log"></div>
+  </div>
+
+  <script>
+    const log = (msg) => {
+      const logEl = document.getElementById('log');
+      logEl.textContent += `[${new Date().toLocaleTimeString()}] ${msg}\n`;
+      logEl.scrollTop = logEl.scrollHeight;
+    };
+
+    async function refreshUsers() {
+      try {
+        const res = await fetch('/admin/list');
+        const text = await res.text();
+        let json;
+        try {
+          json = JSON.parse(text);
+        } catch {
+          log('Invalid JSON from server: ' + text);
+          alert('Server returned invalid JSON (check server logs)');
+          return;
+        }
+
+        const ul = document.getElementById('users');
+        ul.innerHTML = '';
+        if (!json.users || json.users.length === 0) {
+          ul.innerHTML = '<li>No users found in Firestore.</li>';
+          return;
+        }
+        json.users.forEach(u => {
+          const li = document.createElement('li');
+          li.textContent = `${u.userId} — ${u.endpoint ? u.endpoint.slice(0, 50) + '...' : 'no-endpoint'}`;
+          ul.appendChild(li);
+        });
+        log('Users loaded successfully.');
+      } catch (err) {
+        log('Error fetching users: ' + err.message);
+      }
+    }
+
+    async function sendNotification() {
+      const title = document.getElementById('title').value;
+      const body = document.getElementById('body').value;
+      const url = document.getElementById('url').value || '/';
+      const icon = document.getElementById('icon').value || undefined;
+      const tag = document.getElementById('tag').value || ('tag-' + Date.now());
+      const ttl = Number(document.getElementById('ttl').value) || 86400;
+      let data;
+      try { data = JSON.parse(document.getElementById('data').value || '{}'); }
+      catch(e) { alert('Invalid JSON in data field'); return; }
+      const target = document.getElementById('target').value;
+      const userId = document.getElementById('userId').value.trim();
+
+      const payload = { title, body, url, icon, ttl, tag, data, target };
+      if (target === 'single') payload.userId = userId;
+
+      log('Sending push...');
+      try {
+        const res = await fetch('/admin/send', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const result = await res.json();
+        log('Response: ' + JSON.stringify(result, null, 2));
+      } catch (e) {
+        log('Error sending push: ' + e.message);
+      }
+    }
+
+    document.getElementById('refresh').addEventListener('click', refreshUsers);
+    document.getElementById('send').addEventListener('click', sendNotification);
+
+    refreshUsers();
+  </script>
+</body>
+</html>
