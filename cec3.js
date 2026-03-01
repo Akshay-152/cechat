@@ -385,7 +385,7 @@ function listenOnlineCount() {
   // compute cutoff and set up a listener
   const setupListener = () => {
     // compute server-style cutoff using Firestore Timestamp.fromDate if available
-    let cutoffDate = new Date(Date.now() - OFFLINE_CUTOFF_MINUTES * 60 * 1000);
+    let cutoffDate = new Date(Date.now() - OFFLINE_CUTOFF_MINUTES * 20 * 1000);
     let cutoffValue;
     try {
       // prefer Timestamp if available (modular SDK)
@@ -426,7 +426,7 @@ function listenOnlineCount() {
       onlineQueryUnsub = null;
     }
     setupListener();
-  }, 60_000);
+  }, 30_000);
 
   // return cleanup function if needed
   return () => {
