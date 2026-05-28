@@ -1,0 +1,613 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>CECHAT - CEC CHAT</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="disabled.js"></script>
+  
+  <link rel="icon" type="image/webp" href="https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEg-nKXpj05IwlvuUZy4xy99wtJbhOxQquD4velU1oSRGRySe-NvSUAWTAGJ3MyLzAIXJs_q3CxBa_tO8pZ-5PArSqtczhsnwXgz-mLwlQnSWhn520IPhUuuGp6tIZL42K0OD2vgiI9L4L3uMJicNypaPSZ74glIu4ceZ6FImzZDlexngZAdlcRx8qBpHo4/s1440/1000127436.webp">
+  
+  <!--  --> 
+  <style>
+.loader {
+  width: 22px;
+  height: 22px;
+  border: 3px solid #ccc;
+  border-top-color: #2196f3;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+  margin: auto;
+}
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+
+
+.extend-btn {
+  margin-top: 2px;
+ 
+  background: #007bff;
+  border: none;
+  border-radius: 6px;
+  color: white;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.extend-btn:hover {
+  background: #0057c9;
+}
+
+
+
+
+
+/* XOX game card inside chat */
+.xox-card {
+  margin-top: 6px;
+  padding: 8px;
+  border-radius: 10px;
+  background: rgba(0,0,0,0.15);
+  backdrop-filter: blur(6px);
+  border: 1px dashed rgba(255,255,255,0.5);
+}
+
+.xox-title {
+  font-weight: 700;
+  font-size: 0.9rem;
+  margin-bottom: 4px;
+}
+
+.xox-meta {
+  font-size: 0.78rem;
+  opacity: 0.9;
+  margin-bottom: 6px;
+}
+
+.xox-open-btn {
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: none;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* XOX overlay */
+.xox-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+}
+
+.xox-overlay.hidden {
+  display: none;
+}
+
+.xox-modal {
+  width: 100%;
+  max-width: 420px;
+  background: linear-gradient(135deg,#6a11cb,#2575fc);
+  color: #fff;
+  border-radius: 14px;
+  padding: 14px;
+  box-shadow: 0 12px 25px rgba(0,0,0,0.4);
+}
+
+.xox-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.xox-close-btn {
+  border: none;
+  background: transparent;
+  color: #fff;
+  font-size: 1.4rem;
+  cursor: pointer;
+}
+
+.xox-top-info {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.85rem;
+  margin-bottom: 10px;
+}
+
+.xox-board {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.xox-cell {
+  aspect-ratio: 1;
+  background: rgba(255,255,255,0.08);
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2.4rem;
+  cursor: pointer;
+  user-select: none;
+}
+
+.xox-cell:hover {
+  background: rgba(255,255,255,0.18);
+  transform: translateY(-2px);
+}
+
+.xox-cell.x { color: #4caf50; }
+.xox-cell.o { color: #f44336; }
+
+.xox-cell.winning {
+  box-shadow: 0 0 18px rgba(255,235,59,0.6);
+}
+
+.xox-status-bar {
+  font-size: 0.8rem;
+  padding: 6px;
+  border-radius: 8px;
+  background: rgba(0,0,0,0.2);
+  margin-bottom: 8px;
+}
+
+.xox-btn {
+  border: none;
+  padding: 6px 12px;
+  border-radius: 10px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  background: rgba(255,255,255,0.15);
+  color: #fff;
+  width: 100%;
+}
+
+.highlight-message {
+  animation: xox-highlight 1.5s ease-out;
+}
+
+@keyframes xox-highlight {
+  0%   { box-shadow: 0 0 0 rgba(255,255,0,0.0); }
+  30%  { box-shadow: 0 0 18px rgba(255,255,0,0.8); }
+  100% { box-shadow: 0 0 0 rgba(255,255,0,0.0); }
+}
+
+
+
+.xox-host-indicator {
+  position: fixed;
+  bottom: 70px;
+  right: 16px;
+  padding: 8px 12px;
+  background: rgba(15,23,42,0.95);
+  color: #fff;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  box-shadow: 0 8px 20px rgba(0,0,0,0.4);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  z-index: 9999;
+}
+
+.xox-host-indicator::before {
+  content: '';
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #22c55e;
+  box-shadow: 0 0 10px #22c55e;
+}
+
+.xox-host-indicator.hidden {
+  display: none;
+}
+
+
+.hidden {
+  display: none !important;
+}
+
+
+.message-sender {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.message-avatar {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid rgba(255,255,255,0.5);
+  box-shadow: 0 0 6px rgba(255,255,255,0.5);
+}
+
+.message-avatar.placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.8rem;
+  background: rgba(148,163,184,0.4);
+  color: #e5e7eb;
+}
+
+.menu-profile-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: 12px;
+  gap: 6px;
+}
+
+.menu-profile-pic {
+  width: 80px;
+  height: 80px;
+  border-radius: 18px;
+  object-fit: cover;
+  border: 3px solid rgba(255,255,255,0.5);
+  box-shadow: 0 0 14px rgba(255,255,255,0.4);
+  background: rgba(255,255,255,0.1);
+}
+
+
+
+
+</style>
+
+  
+  
+    <link rel="stylesheet" href="style.css">
+
+</head>
+<body>
+    <div class="chat-container">
+        <header class="chat-header">
+            <div class="header-left">
+                <h1><i class="fas fa-comments"></i> CECHAT</h1>
+                <div class="user-indicator">
+                    <span class="user-color-badge" id="userColorBadge"></span>
+                    <span id="userName">You</span>
+                </div>
+                
+
+            </div>
+            <div class="header-right">
+                <div class="message-counter">
+                    <span id="messageCount">0/25</span>
+                               </div>
+                <button id="themeToggle" class="theme-btn">
+                    <i class="fas fa-palette"></i>
+                </button>
+                <button id="menuButton" class="menu-btn">
+                    <i class="fas fa-bars"></i>
+                </button>
+            </div>
+        </header>
+
+        <div class="messages-container" id="messagesContainer">
+            <div class="system-message">
+                <i class="fas fa-info-circle"></i> 
+                Your messages will be automatically deleted after 1-3 days (minimize using bad words)
+                
+             
+                
+<!-- Add this new small online counter (below or beside message-counter) -->
+<div class="message-counter" style="margin-left:10px; min-width:90px; color:black;">
+    
+    <span id="onlineCount">0</span>
+    <span class="counter-label">Online</span>
+</div>
+
+
+
+
+
+<div id="chatLoading" style="text-align:center; padding:12px;">
+  <div class="loader"></div>
+  <div style="margin-top:6px; color:#555; font-size:14px;">
+    Loading chat...
+  </div>
+</div>
+
+
+
+
+            </div>
+        </div>
+
+
+
+
+
+        <div class="floating-input-container">
+            <div id="replyIndicator" class="reply-indicator" style="display: none;">
+                <div class="reply-content">
+                    <strong>Replying to:</strong> 
+                    <span id="replyText"></span>
+                </div>
+                <button class="cancel-reply" id="cancelReply">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+
+            <div class="input-group">
+                <textarea id="messageInput" placeholder="Type a message..." maxlength="500" rows="1"></textarea>
+                
+            <button id="gameXoxBtn" class="send-btn" style="margin-right:6px;">
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="white">
+    <path d="M6.5 7C4.57 7 3 8.57 3 10.5v6c0 1.38 1.12 2.5 2.5 2.5 1.02 0 1.9-.61 2.28-1.5h8.44c.38.89 1.26 1.5 2.28 1.5 1.38 0 2.5-1.12 2.5-2.5v-6C21 8.57 19.43 7 17.5 7c-.99 0-1.87.5-2.4 1.25H8.9C8.37 7.5 7.49 7 6.5 7zm1 3h1.5a.5.5 0 010 1H7.5v1.5a.5.5 0 01-1 0V11H5a.5.5 0 010-1h1.5V8.5a.5.5 0 011 0V10zm10 0a1 1 0 110 2 1 1 0 010-2zm-2 1a1 1 0 110 2 1 1 0 010-2z"/>
+  </svg>
+</button>
+
+
+                <button id="sendButton" class="send-btn">
+                    <i class="fas fa-paper-plane"></i>
+                </button>
+            </div>
+         
+        </div>
+
+        <div class="menu-overlay" id="menuOverlay"></div>
+        <div class="menu-panel" id="menuPanel">
+            <div class="menu-header">
+                <h2>Settings</h2>
+                <button class="cancel-reply" id="closeMenu">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+
+            <div class="menu-section">
+                <h3>Your Profile</h3>
+                 <div class="chat-info">
+                   
+        
+                
+                <span class="timestamp" id="currentTime"></span>
+                   
+             
+
+   
+            </div>
+
+
+            <div id="menuProfileBox" class="menu-profile-box">
+  <img id="menuProfilePic" class="menu-profile-pic" src="" alt="Profile Picture">   
+  
+                <!-- Hidden file input for avatar -->
+
+                <div id="avatarUploadLoader" class="loader" style="display:none;"></div>
+
+<input 
+  type="file" 
+  id="avatarFileInput" 
+  accept="image/*" 
+  style="display:none;" 
+/>
+              <br>
+
+<!-- Button in menu to change profile picture -->
+<button id="changeAvatarBtn" class="color-change-btn">
+  Change Profile Picture (10 CE)
+</button>
+
+<br>
+
+
+
+                <input type="text" id="userNameInput" class="name-input" placeholder="Enter your name (optional)" maxlength="20">
+                <button class="color-change-btn" id="changeColorBtn">
+                    <i class="fas fa-sync-alt"></i> Change My Color
+                </button>
+            </div>
+            
+                       
+            
+            
+                        <div class="menu-section">
+    
+    <!-- Add this CE coin display -->
+    <p style="margin-top:1px; font-weight:700;">CE coin : <span id="ceCoin">-</span></p>
+</div>
+
+ <!-- Add into your menu panel HTML -->
+<button id="reduceMsgBtn" class="color-change-btn">Extra 10 Message (5 CE)
+</button> 
+
+
+
+
+
+
+            <div class="menu-section">
+                <br>
+
+                <h3>Theme</h3>
+                <div class="theme-options">
+                    <div class="theme-option" data-theme="light">Light</div>
+                    <div class="theme-option" data-theme="dark">Dark</div>
+                    <div class="theme-option" data-theme="ocean">Ocean</div>
+                    <div class="theme-option" data-theme="sunset">Sunset</div>
+                    <div class="theme-option" data-theme="forest">Forest</div>
+                </div>
+            </div>
+
+            <div class="menu-section">
+                <h3>Chat Info</h3>
+                <div class="info-text">
+                    <p><strong>Messages:</strong> <span id="menuMessageCount">0</span>/4 today</p>
+                    <p><strong>Expiry:</strong> 1-2 days</p>
+                    <p><strong>Features:</strong> </p>
+                   <p>1.Click messages to reply
+                    <br>
+                    2.Spend 5 minutes online to earn CE coins!
+</p>
+                </div>
+            </div>
+          
+          <div class="menu-section">
+          <div id="policySection">
+
+  <button class="policyButton">^ Policy Button</button>
+
+  <div class="policyContent">
+
+    
+   <p>
+  By accessing and using this web app, you agree to use it responsibly and in compliance with all applicable laws. Messages sent by users, including anonymous ones, are their sole responsibility. The developer is not liable for any misuse, offensive content, or illegal activity conducted through this platform. Minimal data is collected only for communication purposes and is kept secure. By using this site, you acknowledge that the services are provided "as is" without any warranties, and you accept that the developer cannot be held responsible for any issues or damages arising from user actions.
+</p>    
+    
+        <br>
+
+  </div>
+
+    
+
+</div>
+          </div>
+
+            <div class="menu-section">
+                <h3>Developer</h3>
+                <div class="info-text" style="text-align: center; font-size: 1rem; font-weight: 600; color: var(--accent-color); margin-top: 0.5rem;">
+                <!--ANONYMOUS-->    <p><b>ANONYMOUS</b></p>
+                </div>
+            </div>
+        </div>
+
+        <div class="toast" id="toast"></div>
+    </div>
+
+
+
+
+ <!-- XOX Game Overlay -->
+<div id="xoxOverlay" class="xox-overlay hidden">
+  <div class="xox-modal">
+    <div class="xox-header">
+      <span>XOX - Tic Tac Toe</span>
+      <button id="xoxCloseBtn" class="xox-close-btn">&times;</button>
+    </div>
+
+    <div class="xox-top-info">
+      <div>You: <strong id="xoxMyRole">-</strong></div>
+      <div>Turn: <strong id="xoxTurn">-</strong></div>
+    </div>
+
+    <div class="xox-board" id="xoxBoard">
+      <div class="xox-cell" data-index="0"></div>
+      <div class="xox-cell" data-index="1"></div>
+      <div class="xox-cell" data-index="2"></div>
+      <div class="xox-cell" data-index="3"></div>
+      <div class="xox-cell" data-index="4"></div>
+      <div class="xox-cell" data-index="5"></div>
+      <div class="xox-cell" data-index="6"></div>
+      <div class="xox-cell" data-index="7"></div>
+      <div class="xox-cell" data-index="8"></div>
+    </div>
+
+    <div id="xoxStatusBar" class="xox-status-bar">Waiting for updates...</div>
+
+  <div class="xox-footer">
+  <button id="xoxResetBtn" class="xox-btn">Reset Round</button>
+
+  <!-- AI Enable -->
+  <button id="xoxAiEnableBtn" class="xox-btn hidden" style="margin-top:6px;">
+    Enable AI (O)
+  </button>
+
+  <!-- AI Disable -->
+  <button id="xoxAiDisableBtn" class="xox-btn hidden" style="margin-top:6px; background:#dc2626;">
+    Disable AI
+  </button>
+</div>
+
+
+  </div>
+</div>
+
+
+ 
+   <div id="xoxHostIndicator" class="xox-host-indicator hidden">
+  Someone is playing your XOX game 🎮
+</div>
+
+  
+  
+  
+  <script type="module" src="script.js"></script>
+  
+  <script>
+
+const policyButtons = document.querySelectorAll('.policyButton');
+
+const policyContents = document.querySelectorAll('.policyContent');
+
+policyButtons.forEach((btn, index) => {
+
+  const content = policyContents[index];
+
+  btn.addEventListener('click', () => {
+
+    const isOpen = content.classList.contains('open');
+
+    if(isOpen){
+
+      content.classList.remove('open');
+
+      btn.textContent = btn.textContent.replace('v','^');
+
+    } else {
+
+      content.classList.add('open');
+
+      btn.textContent = btn.textContent.replace('^','v');
+
+    }
+
+  });
+
+});
+
+
+
+
+
+    
+</script>
+
+
+<script>
+setTimeout(() => {
+  const el = document.getElementById("chatLoading");
+  el.style.transition = "opacity 0.4s";
+  el.style.opacity = "0";
+
+  setTimeout(() => {
+    el.style.display = "none";
+  }, 400); // after fade-out
+}, 2000); // 4 seconds
+
+
+
+</script>  
+  
+  
+  
+  
+  
+</body>
+</html>
