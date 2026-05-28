@@ -501,6 +501,12 @@ updatePresence(true);
 
 function displayMessage(message, messageId, isNewMessage = false) {
 
+    // Ensure latest message stays visible above the fixed input
+    // (also helps on mobile where keyboard/open UI may cover bottom content)
+    // We'll scroll after inserting the new DOM node.
+
+
+
     // ------------------ EXPIRY HANDLING ------------------
     if (isMessageExpired(message)) {
 

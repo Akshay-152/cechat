@@ -332,6 +332,17 @@
 
 
 
+        <div id="custom-edit-modal" class="modal-overlay hidden" aria-hidden="true">
+            <div class="glass-modal" role="dialog" aria-modal="true" aria-labelledby="edit-message-title">
+              <h3 id="edit-message-title">Edit Message</h3>
+              <input type="text" id="edit-message-input" autocomplete="off" />
+              <div class="modal-actions">
+                <button id="cancel-edit" class="btn-secondary" type="button">Cancel</button>
+                <button id="save-edit" class="btn-primary" type="button">Save</button>
+              </div>
+            </div>
+        </div>
+
         <div class="floating-input-container">
             <div id="replyIndicator" class="reply-indicator" style="display: none;">
                 <div class="reply-content">
