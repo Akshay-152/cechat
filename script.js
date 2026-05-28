@@ -60,7 +60,6 @@ let currentAvatarUrl = null;
 
 
 
-        const MAX_MESSAGES_PER_DAY = 25;
         const MESSAGE_EXPIRY_DAYS = 1.5;
 
         const messagesContainer = document.getElementById('messagesContainer');
@@ -74,19 +73,24 @@ let currentAvatarUrl = null;
         const userNameInput = document.getElementById('userNameInput');
         const changeColorBtn = document.getElementById('changeColorBtn');
         const userColorBadge = document.getElementById('userColorBadge');
-        const messageCount = document.getElementById('messageCount');
-        const menuMessageCount = document.getElementById('menuMessageCount');
+
         const currentTime = document.getElementById('currentTime');
         const replyIndicator = document.getElementById('replyIndicator');
         const replyText = document.getElementById('replyText');
         const cancelReply = document.getElementById('cancelReply');
         const toast = document.getElementById('toast');
         const themeOptions = document.querySelectorAll('.theme-option');
+        
+        const recordAudioBtn = document.getElementById('recordAudioBtn');
+        const typingIndicator = document.getElementById('typingIndicator');
+        let mediaRecorder;
+        let audioChunks = [];
+        let isRecording = false;
+        let typingTimeout = null;
 
         let userId = localStorage.getItem('userId') || generateUserId();
         let userName = localStorage.getItem('userName') || "You";
         let userColor = localStorage.getItem('userColor') || generateRandomColor();
-        let messagesSentToday = 0;
         let replyingTo = null;
         let isInitialLoad = true;
         let existingMessageIds = new Set();
@@ -119,9 +123,7 @@ let currentAvatarUrl = null;
         }
 
         function updateMessageCounter() {
-            const count = `${messagesSentToday}/${MAX_MESSAGES_PER_DAY}`;
-            messageCount.textContent = count;
-            menuMessageCount.textContent = messagesSentToday;
+            // Deprecated
         }
 
         function updateTime() {
@@ -129,32 +131,11 @@ let currentAvatarUrl = null;
             currentTime.textContent = now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
         }
 
-        function loadMessageCount() {
-            const data = localStorage.getItem('chatData');
-            if (data) {
-                const parsed = JSON.parse(data);
-                const today = new Date().toDateString();
-                if (parsed.date === today) {
-                    messagesSentToday = parsed.count || 0;
-                } else {
-                    messagesSentToday = 0;
-                    saveMessageCount();
-                }
-            }
-            updateMessageCounter();
-        }
+        function loadMessageCount() { }
 
-        function saveMessageCount() {
-            const today = new Date().toDateString();
-            const data = { date: today, count: messagesSentToday };
-            localStorage.setItem('chatData', JSON.stringify(data));
-        }
+        function saveMessageCount() { }
 
         function canSendMessage() {
-            if (messagesSentToday >= MAX_MESSAGES_PER_DAY) {
-                showToast('Daily message limit reached (25 messages)');
-                return false;
-            }
             return true;
         }
 
@@ -165,9 +146,37 @@ let currentAvatarUrl = null;
 
 
 async function sendMessage() {
+  if (selectedImageFile) {
+    const file = selectedImageFile;
+    selectedImageFile = null;
+    imagePreviewContainer.style.display = 'none';
+    photoInput.value = '';
+    
+    showToast('Uploading image...');
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('upload_preset', window.ENV.CLOUDINARY_UPLOAD_PRESET);
+
+    try {
+        const res = await fetch(`https://api.cloudinary.com/v1_1/${window.ENV.CLOUDINARY_CLOUD_NAME}/image/upload`, {
+            method: 'POST',
+            body: formData
+        });
+        const data = await res.json();
+        if (data.secure_url) {
+            await sendImageMessage(data.secure_url);
+        } else {
+            showToast('Upload failed.');
+        }
+    } catch (err) {
+        console.error('Cloudinary error', err);
+        showToast('Error uploading image');
+    }
+    return; // Don't send text message if image is attached (for simplicity now)
+  }
+
   const messageText = messageInput.value.trim();
   if (!messageText) return;
-  if (!canSendMessage()) return;
 
   // Check if current local userId is banned
   const localUserId = userId;
@@ -186,9 +195,6 @@ async function sendMessage() {
       messageInput.value = '';
       messageInput.style.height = 'auto';
       cancelReplyTo();
-      messagesSentToday++;
-      saveMessageCount();
-      updateMessageCounter();
       scrollToBottom();
     } catch (err) {
       console.error('Error creating XOX game:', err);
@@ -215,9 +221,6 @@ async function sendMessage() {
     messageInput.value = '';
     messageInput.style.height = 'auto';
     cancelReplyTo();
-    messagesSentToday++;
-    saveMessageCount();
-    updateMessageCounter();
     scrollToBottom();
   } catch (error) {
     console.error('Error sending message:', error);
@@ -620,14 +623,30 @@ function displayMessage(message, messageId, isNewMessage = false) {
             </button>
           </div>
         `;
+    } else if (message.type === 'audio') {
+        mainContentHtml = `<audio controls src="${message.audioUrl}" style="max-width: 250px; outline: none; margin: 5px 0;"></audio>`;
+    } else if (message.type === 'image') {
+        mainContentHtml = `<img src="${message.imageUrl}" class="message-image" alt="Shared photo" loading="lazy">`;
     } else {
         // normal text message
         mainContentHtml = `<div class="message-text">${message.text}</div>`;
     }
 
     // ---------- Final bubble HTML ----------
+    let reactionHtml = '';
+    if (message.reactions) {
+        let count = 0;
+        for (const [uid, react] of Object.entries(message.reactions)) {
+            if (react) count++;
+        }
+        if (count > 0) {
+            reactionHtml = `<div class="reactions-container"><span class="reaction-badge">❤️ ${count}</span></div>`;
+        }
+    }
+
+    const messageStyleBase = message.expiresAt ? (message.expiresAt.toDate() < new Date() ? 'opacity: 0.5;' : '') : '';
     messageDiv.innerHTML = `
-        <div class="message-bubble" style="${messageStyle}" data-message-id="${messageId}">
+        <div class="message-bubble" style="${messageStyle}; ${messageStyleBase}" data-message-id="${messageId}">
             ${!isCurrentUser ? `
                 <div class="message-sender" style="${senderNameStyle}">
                     ${avatarHtml}
@@ -637,8 +656,16 @@ function displayMessage(message, messageId, isNewMessage = false) {
             ` : ''}
             ${replySection}
             ${mainContentHtml}
+            ${reactionHtml}
+            <div class="message-actions">
+                <button class="msg-action-btn react-btn" data-id="${messageId}">❤️</button>
+                ${isCurrentUser ? `
+                    ${message.type !== 'image' && message.type !== 'audio' && message.type !== 'xoxGame' ? `<button class="msg-action-btn edit-btn" data-id="${messageId}"><i class="fas fa-edit"></i></button>` : ''}
+                    <button class="msg-action-btn delete-btn" data-id="${messageId}"><i class="fas fa-trash"></i></button>
+                ` : ''}
+            </div>
             <div class="message-time">
-                ${timestamp}
+                ${message.edited ? '(edited)' : ''} ${timestamp}
             </div>
         </div>
     `;
@@ -654,11 +681,86 @@ function displayMessage(message, messageId, isNewMessage = false) {
         }
     }
 
-    // ---------- Reply on click ----------
+    // ---------- Reply via Swipe or Double Click ----------
     const bubble = messageDiv.querySelector('.message-bubble');
-    bubble.addEventListener('click', () => {
-        replyToMessage(messageId, message.text, message.color, message.sender);
+    const replyHint = document.createElement('div');
+    replyHint.className = 'reply-hint';
+    replyHint.innerHTML = '↩️';
+    messageDiv.insertBefore(replyHint, bubble);
+
+    let startX = 0;
+    let isDragging = false;
+
+    bubble.addEventListener('touchstart', (e) => {
+        startX = e.touches[0].clientX;
+        isDragging = true;
+        bubble.style.transition = 'none';
+    }, { passive: true });
+
+    bubble.addEventListener('touchmove', (e) => {
+        if (!isDragging) return;
+        let diff = e.touches[0].clientX - startX;
+        if (diff > 0 && diff < 70) {
+            bubble.style.transform = `translateX(${diff}px)`;
+            replyHint.style.opacity = diff / 70;
+        }
+    }, { passive: true });
+
+    bubble.addEventListener('touchend', (e) => {
+        if (!isDragging) return;
+        isDragging = false;
+        let diff = e.changedTouches[0].clientX - startX;
+        
+        bubble.style.transition = 'transform 0.2s ease-out';
+        bubble.style.transform = `translateX(0px)`;
+        replyHint.style.opacity = 0;
+        
+        if (diff > 50) {
+            let replyText = message.type === 'image' ? '📸 Photo' : message.text;
+            replyToMessage(messageId, replyText, message.color, message.sender);
+        }
     });
+
+    bubble.addEventListener('dblclick', () => {
+        let replyText = message.type === 'image' ? '📸 Photo' : (message.type === 'audio' ? '🎤 Voice Note' : message.text);
+        replyToMessage(messageId, replyText, message.color, message.sender);
+    });
+
+    const reactBtn = messageDiv.querySelector('.react-btn');
+    if (reactBtn) {
+        reactBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const currentReact = message.reactions && message.reactions[userId] === '❤️';
+            updateDoc(doc(db, 'messages', messageId), {
+                [`reactions.${userId}`]: currentReact ? null : '❤️'
+            }).catch(err => console.error("Failed to react", err));
+        });
+    }
+
+    if (isCurrentUser) {
+        const editBtn = messageDiv.querySelector('.edit-btn');
+        const deleteBtn = messageDiv.querySelector('.delete-btn');
+        if (editBtn) {
+            editBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const newText = prompt("Edit message:", message.text);
+                if (newText !== null && newText.trim() !== "" && newText.trim() !== message.text) {
+                    updateDoc(doc(db, 'messages', messageId), {
+                        text: newText.trim(),
+                        edited: true
+                    }).catch(err => showToast("Failed to edit"));
+                }
+            });
+        }
+        if (deleteBtn) {
+            deleteBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (confirm("Delete this message?")) {
+                    deleteDoc(doc(db, 'messages', messageId)).catch(err => showToast("Failed to delete"));
+                }
+            });
+        }
+    }
 
     // ---------- Long-press for admin ----------
     let longPressTimer = null;
@@ -874,10 +976,10 @@ async function isBanned(userId) {
         }
 
         async function cleanExpiredMessages() {
-            const threeDaysAgo = new Date(Date.now() - MESSAGE_EXPIRY_DAYS *24*60*60*1000);
+            const expiryTime = new Date(Date.now() - MESSAGE_EXPIRY_DAYS *24*60*60*1000);
             
             try {
-                const q = query(collection(db, 'messages'), where('timestamp', '<', threeDaysAgo));
+                const q = query(collection(db, 'messages'), where('timestamp', '<', expiryTime));
                 const snapshot = await getDocs(q);
                 
                 const batch = writeBatch(db);
@@ -976,6 +1078,172 @@ function updateUserName(e) {
         }
 
         sendButton.addEventListener('click', sendMessage);
+        
+        const attachPhotoBtn = document.getElementById('attachPhotoBtn');
+        const photoInput = document.getElementById('photoInput');
+        const imagePreviewContainer = document.getElementById('imagePreviewContainer');
+        const imagePreviewContent = document.getElementById('imagePreviewContent');
+        const cancelImagePreviewBtn = document.getElementById('cancelImagePreview');
+        let selectedImageFile = null;
+
+        if (attachPhotoBtn && photoInput) {
+            attachPhotoBtn.addEventListener('click', () => photoInput.click());
+            photoInput.addEventListener('change', (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+
+                if (file.size > 20 * 1024 * 1024) {
+                    showToast('Image must be less than 20MB');
+                    photoInput.value = '';
+                    return;
+                }
+                
+                selectedImageFile = file;
+                imagePreviewContent.src = URL.createObjectURL(file);
+                imagePreviewContainer.style.display = 'flex';
+                messageInput.focus();
+            });
+
+            cancelImagePreviewBtn.addEventListener('click', () => {
+                selectedImageFile = null;
+                photoInput.value = '';
+                imagePreviewContainer.style.display = 'none';
+                imagePreviewContent.src = '';
+            });
+        }
+
+        async function sendImageMessage(imageUrl) {
+            const localUserId = userId;
+            const bannedNow = await isBanned(localUserId);
+            if (bannedNow) {
+                showToast('You are banned from sending messages (reported).');
+                return;
+            }
+            const message = {
+                text: '',
+                color: userColor,
+                sender: userName === "You" ? "Anonymous" : userName,
+                userId: userId,
+                avatar: currentAvatarUrl || null,
+                timestamp: serverTimestamp(),
+                type: 'image',
+                imageUrl: imageUrl,
+                expiresAt: new Date(Date.now() + MESSAGE_EXPIRY_DAYS * 24 * 60 * 60 * 1000),
+                replyTo: replyingTo
+            };
+            try {
+                await addDoc(collection(db, 'messages'), message);
+                cancelReplyTo();
+                scrollToBottom();
+            } catch (error) {
+                console.error('Error sending message:', error);
+                showToast('Error sending image');
+            }
+        }
+        
+        if (recordAudioBtn) {
+            recordAudioBtn.addEventListener('click', async () => {
+                if (isRecording) {
+                    mediaRecorder.stop();
+                    recordAudioBtn.innerHTML = '<i class="fas fa-microphone"></i>';
+                    recordAudioBtn.classList.remove('recording-pulse');
+                    isRecording = false;
+                } else {
+                    try {
+                        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                        mediaRecorder = new MediaRecorder(stream);
+                        audioChunks = [];
+                        
+                        mediaRecorder.ondataavailable = (e) => {
+                            if (e.data.size > 0) audioChunks.push(e.data);
+                        };
+                        
+                        mediaRecorder.onstop = async () => {
+                            const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                            stream.getTracks().forEach(track => track.stop());
+                            
+                            showToast('Uploading audio...');
+                            const formData = new FormData();
+                            formData.append('file', audioBlob);
+                            formData.append('upload_preset', window.ENV.CLOUDINARY_UPLOAD_PRESET);
+
+                            try {
+                                const res = await fetch(`https://api.cloudinary.com/v1_1/${window.ENV.CLOUDINARY_CLOUD_NAME}/video/upload`, {
+                                    method: 'POST',
+                                    body: formData
+                                });
+                                const data = await res.json();
+                                if (data.secure_url) {
+                                    await sendAudioMessage(data.secure_url);
+                                } else {
+                                    showToast('Upload failed.');
+                                }
+                            } catch (err) {
+                                console.error('Cloudinary error', err);
+                                showToast('Error uploading audio');
+                            }
+                        };
+                        
+                        mediaRecorder.start();
+                        recordAudioBtn.innerHTML = '<i class="fas fa-stop"></i>';
+                        recordAudioBtn.classList.add('recording-pulse');
+                        isRecording = true;
+                    } catch (err) {
+                        showToast('Microphone access denied');
+                    }
+                }
+            });
+        }
+        
+        async function sendAudioMessage(audioUrl) {
+            const localUserId = userId;
+            const bannedNow = await isBanned(localUserId);
+            if (bannedNow) {
+                showToast('You are banned from sending messages (reported).');
+                return;
+            }
+            const message = {
+                text: '',
+                color: userColor,
+                sender: userName === "You" ? "Anonymous" : userName,
+                userId: userId,
+                avatar: currentAvatarUrl || null,
+                timestamp: serverTimestamp(),
+                type: 'audio',
+                audioUrl: audioUrl,
+                expiresAt: new Date(Date.now() + MESSAGE_EXPIRY_DAYS * 24 * 60 * 60 * 1000),
+                replyTo: replyingTo
+            };
+            try {
+                await addDoc(collection(db, 'messages'), message);
+                cancelReplyTo();
+                scrollToBottom();
+            } catch (error) {
+                console.error('Error sending message:', error);
+                showToast('Error sending audio');
+            }
+        }
+        
+        // Setup global listener for typing
+        onSnapshot(query(collection(db, 'typing'), where('isTyping', '==', true)), (snapshot) => {
+            const typingUsers = [];
+            snapshot.forEach(docSnap => {
+                if (docSnap.id !== userId) {
+                    typingUsers.push(docSnap.data().name);
+                }
+            });
+            if (typingIndicator) {
+                if (typingUsers.length > 0) {
+                    typingIndicator.style.display = 'block';
+                    typingIndicator.textContent = typingUsers.length === 1 
+                        ? `${typingUsers[0]} is typing...` 
+                        : `${typingUsers.length} people are typing...`;
+                } else {
+                    typingIndicator.style.display = 'none';
+                }
+            }
+        });
+
         messageInput.addEventListener('keydown', (e) => {
             if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
@@ -986,6 +1254,15 @@ function updateUserName(e) {
         messageInput.addEventListener('input', function() {
             this.style.height = 'auto';
             this.style.height = Math.min(this.scrollHeight, 130) + 'px';
+            
+            // Typing logic
+            if (userId) {
+                setDoc(doc(db, 'typing', userId), { name: userName === "You" ? "Anonymous" : userName, isTyping: true }, { merge: true }).catch(()=>{});
+                clearTimeout(typingTimeout);
+                typingTimeout = setTimeout(() => {
+                    setDoc(doc(db, 'typing', userId), { isTyping: false }, { merge: true }).catch(()=>{});
+                }, 2000);
+            }
         });
 
         messageInput.addEventListener('focus', function() {
@@ -1042,144 +1319,12 @@ function updateUserName(e) {
         
         
         
- // ---------------- CE COIN (generate every 3 minutes and add to Firestore) ----------------
-import {
-  doc as firestoreDoc,
-  onSnapshot as onDocSnapshot,
-  runTransaction
-} from 'https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js';
-
-// ensure ceCoin element exists in DOM
-const ceCoinEl = document.getElementById('ceCoin');
-
-// helper: random 1-8 inclusive
-function generateRandomCoin() {
-  return Math.floor(Math.random() * 8) + 1;
-}
-
-// atomically add random value to user's coin field using a transaction
-async function addRandomCoinToFirestore() {
-  if (!userId) return;
-  const ref = firestoreDoc(db, 'coin', String(userId));
-  const randomVal = generateRandomCoin();
-
-  try {
-    await runTransaction(db, async (tx) => {
-      const snap = await tx.get(ref);
-      const current = (snap.exists() && Number(snap.data().coin)) || 0;
-      const newVal = current + randomVal;
-
-      tx.set(ref, {
-        userId: String(userId),
-        userName: userName === "You" ? "Anonymous" : String(userName),
-        coin: newVal,
-        updatedAt: serverTimestamp()
-      }, { merge: true });
-
-      // update UI immediately inside transaction flow (not required but helpful)
-      if (ceCoinEl) ceCoinEl.textContent = String(newVal);
-    });
-
-    // optional toast to show how much was added
-    // showToast(`+${randomVal} coins added`);
-    return true;
-  } catch (err) {
-    console.error('addRandomCoinToFirestore error', err);
-    showToast('Failed to add coin');
-    return false;
-  }
-}
-
-// Listener: keep UI in sync if coin doc changes in Firestore
-function listenToMyCoinDoc() {
-  if (!userId) return;
-  const myCoinDocRef = firestoreDoc(db, 'coin', String(userId));
-  try {
-    onDocSnapshot(myCoinDocRef, (snap) => {
-      if (!snap.exists()) {
-        if (ceCoinEl) ceCoinEl.textContent = '-';
-        return;
-      }
-      const data = snap.data();
-      if (data && typeof data.coin !== 'undefined') {
-        if (ceCoinEl) ceCoinEl.textContent = String(data.coin);
-      }
-    }, (err) => {
-      console.error('coin doc snapshot error', err);
-    });
-  } catch (e) {
-    console.error('listenToMyCoinDoc error', e);
-  }
-}
-
-// Start coin generation and listening:
-// generate immediately and then every 3 minutes (180000 ms)
-function startCoinRoutine() {
-  // ensure UI listener active
-  listenToMyCoinDoc();
-
-  // initial add on load
-  addRandomCoinToFirestore();
-
-  // schedule every 3 minutes (180,000 ms)
-  setInterval(() => {
-    addRandomCoinToFirestore();
-  }, 5 * 60 * 1000); // 5. minutes
-}
-
-// start when app has initialized userId etc.
-// call this near the end of your init code
-startCoinRoutine();        
+ // ---------------- Removed CE COIN logic and Message Limits ----------------
+        
      
    
    
    
-
-const reduceBtn = document.getElementById('reduceMsgBtn');
-
-reduceBtn.addEventListener('click', handleReduceMessages);
-
-async function handleReduceMessages() {
-  if (!userId) { showToast("Sign in to use coins."); return; }
-
-  // disable while processing
-  reduceBtn.disabled = true;
-
-  try {
-    // --- 1) Read coin doc ---
-    const coinRef = firestoreDoc(db, 'coin', String(userId));
-    const coinSnap = await getDoc(coinRef);
-    const coins = (coinSnap.exists() && Number(coinSnap.data().coin)) || 0;
-
-    if (coins < 5) {
-      showToast('Not enough coins. Need 5 coins.');
-      reduceBtn.disabled = false;
-      return;
-    }
-
-    // --- 2) Deduct 5 coins. (Simple read->write; not strictly atomic) ---
-    const newCoinVal = Math.max(0, coins - 5);
-    await setDoc(coinRef, { coin: newCoinVal, updatedAt: serverTimestamp() }, { merge: true });
-
-    // Update coin UI if present
-    if (ceCoinEl) ceCoinEl.textContent = String(newCoinVal);
-
-    // --- 3) Reduce local message counter by 10 and persist ---
-    messagesSentToday = Math.max(0, Number(messagesSentToday || 0) - 10);
-    saveMessageCount();         // saves to localStorage
-    updateMessageCounter();     // updates UI elements (messageCount/menuMessageCount)
-
-    showToast('Messages reduced by 10 (Cost 5 coins).');
-
-  } catch (err) {
-    console.error('handleReduceMessages error:', err);
-    showToast('Error reducing messages. Try again.');
-  } finally {
-    reduceBtn.disabled = false;
-  }
-}
-
-
 
 
 
@@ -1816,61 +1961,15 @@ async function saveUserAvatar(url) {
 }
 
 
-async function getUserCoins() {
-  if (!userId) return 0;
-  const coinRef = firestoreDoc(db, 'coin', String(userId));
-  const snap = await getDoc(coinRef);
-  const coins = (snap.exists() && Number(snap.data().coin)) || 0;
-  console.log("Current CE coin for avatar:", coins);
-  return coins;
-}
+// CE coin system (removed)
+// Previously used for avatar/message limits. Kept deleted logic out intentionally.
 
-async function spendUserCoins(amount) {
-  if (!userId) throw new Error("No userId");
-  const coinRef = firestoreDoc(db, 'coin', String(userId));
-
-  const snap = await getDoc(coinRef);
-  const current = (snap.exists() && Number(snap.data().coin)) || 0;
-
-  if (current < amount) {
-    throw new Error("Not enough coins");
-  }
-
-  const newVal = Math.max(0, current - amount);
-
-  await setDoc(
-    coinRef,
-    { coin: newVal, updatedAt: serverTimestamp() },
-    { merge: true }
-  );
-
-  // update UI
-  if (typeof ceCoinEl !== "undefined" && ceCoinEl) {
-    ceCoinEl.textContent = String(newVal);
-  }
-
-  console.log(`CE coin spent: ${amount}, remaining: ${newVal}`);
-}
 
 
 if (changeAvatarBtn && avatarFileInput) {
-  changeAvatarBtn.addEventListener("click", async () => {
-    try {
-      const coins = await getUserCoins();
-      if (coins < 10) {
-        showToast && showToast("You need 10 CE coins to change profile picture.");
-        return;
-      }
-
-      // Ask user to confirm spending 10 coins
-      if (!confirm("Change profile picture for 10 CE coins?")) return;
-
-      // Open file picker
+  changeAvatarBtn.addEventListener("click", () => {
+      // Open file picker directly (Free avatars)
       avatarFileInput.click();
-    } catch (err) {
-      console.error("Error checking coins:", err);
-      showToast && showToast("Error checking coin balance");
-    }
   });
 
   
@@ -1905,9 +2004,6 @@ avatarFileInput.addEventListener("change", async (e) => {
     }
 
     const url = data.secure_url;
-
-    // Spend coins
-    await spendUserCoins(10);
 
     // Save avatar URL in Firestore
     await saveUserAvatar(url);

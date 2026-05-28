@@ -287,9 +287,6 @@
 
             </div>
             <div class="header-right">
-                <div class="message-counter">
-                    <span id="messageCount">0/25</span>
-                               </div>
                 <button id="themeToggle" class="theme-btn">
                     <i class="fas fa-palette"></i>
                 </button>
@@ -300,14 +297,14 @@
         </header>
 
         <div class="messages-container" id="messagesContainer">
-            <div class="system-message">
+<div class="system-message">
                 <i class="fas fa-info-circle"></i> 
                 Your messages will be automatically deleted after 1-3 days (minimize using bad words)
                 
-             
+            
                 
 <!-- Add this new small online counter (below or beside message-counter) -->
-<div class="message-counter" style="margin-left:10px; min-width:90px; color:black;">
+<div class="message-counter" style="margin-left:10px; min-width:90px; color:#ffffff; background: rgba(0,0,0,0.12); border: 1px solid rgba(255,255,255,0.18);">
     
     <span id="onlineCount">0</span>
     <span class="counter-label">Online</span>
@@ -318,6 +315,7 @@
 
 
 <div id="chatLoading" style="text-align:center; padding:12px;">
+
   <div class="loader"></div>
   <div style="margin-top:6px; color:#555; font-size:14px;">
     Loading chat...
@@ -344,8 +342,28 @@
                     <i class="fas fa-times"></i>
                 </button>
             </div>
+<div id="typingIndicator" style="display:none; font-size:12px; color:rgba(0,0,0,0.55); padding-left: 15px; margin-bottom: 5px; font-style: italic;">
+                Someone is typing...
+            </div>
+
+<!-- placeholder for improved theme contrast is handled in style.css -->
+
+            
+            <div id="imagePreviewContainer" class="image-preview-container" style="display: none;">
+                <div class="image-preview-content">
+                    <img id="imagePreviewContent" src="" alt="Preview">
+                    <button id="cancelImagePreview" class="cancel-preview-btn"><i class="fas fa-times"></i></button>
+                </div>
+            </div>
 
             <div class="input-group">
+                <button id="attachPhotoBtn" class="send-btn" style="margin-right:6px; background: rgba(0,0,0,0.1); color: var(--text-color);">
+                    <i class="fas fa-image"></i>
+                </button>
+                <button id="recordAudioBtn" class="send-btn" style="margin-right:6px; background: rgba(0,0,0,0.1); color: var(--text-color);">
+                    <i class="fas fa-microphone"></i>
+                </button>
+                <input type="file" id="photoInput" accept="image/*" style="display:none;" />
                 <textarea id="messageInput" placeholder="Type a message..." maxlength="500" rows="1"></textarea>
                 
             <button id="gameXoxBtn" class="send-btn" style="margin-right:6px;">
@@ -402,7 +420,7 @@
 
 <!-- Button in menu to change profile picture -->
 <button id="changeAvatarBtn" class="color-change-btn">
-  Change Profile Picture (10 CE)
+  Change Profile Picture
 </button>
 
 <br>
@@ -419,14 +437,8 @@
             
             
                         <div class="menu-section">
-    
-    <!-- Add this CE coin display -->
-    <p style="margin-top:1px; font-weight:700;">CE coin : <span id="ceCoin">-</span></p>
+    <!-- Removed CE coin display -->
 </div>
-
- <!-- Add into your menu panel HTML -->
-<button id="reduceMsgBtn" class="color-change-btn">Extra 10 Message (5 CE)
-</button> 
 
 
 
@@ -449,12 +461,10 @@
             <div class="menu-section">
                 <h3>Chat Info</h3>
                 <div class="info-text">
-                    <p><strong>Messages:</strong> <span id="menuMessageCount">0</span>/4 today</p>
                     <p><strong>Expiry:</strong> 1-2 days</p>
                     <p><strong>Features:</strong> </p>
-                   <p>1.Click messages to reply
-                    <br>
-                    2.Spend 5 minutes online to earn CE coins!
+                   <p>1. Swipe right or double-click to reply<br>
+                      2. Real-time typing indicators and reactions
 </p>
                 </div>
             </div>
