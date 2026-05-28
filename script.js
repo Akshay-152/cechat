@@ -29,13 +29,13 @@ import {
         
         
         const firebaseConfig = {
-            apiKey: "AIzaSyC-ft54KwehdTIsV93xBjLbd0nMeZ4ibDw",
-            authDomain: "akshay-b744a.firebaseapp.com",
-            projectId: "akshay-b744a",
-            storageBucket: "akshay-b744a.firebasestorage.app",
-            messagingSenderId: "752091661451",
-            appId: "1:752091661451:web:7ccfa46feff8ce87c6808e",
-            measurementId: "G-GKLRSSBRXR"
+            apiKey: window.ENV.FIREBASE_API_KEY,
+            authDomain: window.ENV.FIREBASE_AUTH_DOMAIN,
+            projectId: window.ENV.FIREBASE_PROJECT_ID,
+            storageBucket: window.ENV.FIREBASE_STORAGE_BUCKET,
+            messagingSenderId: window.ENV.FIREBASE_MESSAGING_SENDER_ID,
+            appId: window.ENV.FIREBASE_APP_ID,
+            measurementId: window.ENV.FIREBASE_MEASUREMENT_ID
         };
 
         const app = initializeApp(firebaseConfig);
@@ -48,8 +48,8 @@ import {
 const AI_HIGHLIGHT_THRESHOLD = 5; // for testing; later you can set to 6
 const AI_HIGHLIGHT_DURATION_MS = 1 * 1 * 10 * 1000; // 1 day      
         
-const CLOUDINARY_CLOUD_NAME = "de7bwqvq5";
-const CLOUDINARY_UPLOAD_PRESET = "myupload";
+const CLOUDINARY_CLOUD_NAME = window.ENV.CLOUDINARY_CLOUD_NAME;
+const CLOUDINARY_UPLOAD_PRESET = window.ENV.CLOUDINARY_UPLOAD_PRESET;
 
 
 const avatarFileInput = document.getElementById("avatarFileInput");
